@@ -61,7 +61,10 @@ class LLMClient:
     ) -> str:
  
         lecture_text = self._load_lecture(subject, lecture)
-        system_prompt = "Ты дружелюбный помощник и профессионал. Отвечай кратко, используя предоставленный материал, на русском."
+        system_prompt = '''Ты дружелюбный помощник и профессионал.
+        Используя предоставленный материал, отвечай кратко, на русском, строго в HTML для Telegram.
+        Используй только теги: <b>, <i>, <u>, <s>, <code>, <pre>.
+        Не используй Markdown.'''
 
         payload = {
             "model": self.model,

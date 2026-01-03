@@ -1,6 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
+from aiogram.exceptions import TelegramBadRequest
+
+import html
 
 from bot.services.llm_client import llm_client
 from bot.keyboards import subjects_keyboard, lectures_keyboard
@@ -31,7 +34,11 @@ def save_keyboard_msg(session: dict, msg: Message):
 @router.message(Command(commands=["start"]))
 async def start_handler(message: Message):
     user_sessions[message.from_user.id] = {}
-    await message.answer("Выберите предмет:", reply_markup=subjects_keyboard())
+    await message.answer(
+        "<b>Выберите предмет:</b>",
+        reply_markup=subjects_keyboard(),
+        parse_mode="HTML"
+    )
 
 
 @router.callback_query(F.data.startswith("subject:"))
@@ -47,8 +54,12 @@ async def subject_callback(call: CallbackQuery):
         [InlineKeyboardButton(text="⬅ Назад к предметам", callback_data="back_subjects")]
     )
 
-    await call.message.edit_text(f"Выбран предмет: {subject}. Выберите лекцию:")
-    await call.message.edit_reply_markup(reply_markup=keyboard)
+    await call.message.edit_text(
+        f"<b>Выбран предмет:</b> {html.escape(subject)}\n"
+        f"Выберите лекцию:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
     save_keyboard_msg(session, call.message)
     await call.answer()
@@ -67,8 +78,11 @@ async def lecture_callback(call: CallbackQuery):
     ])
 
     await call.message.edit_text(
-        f"Выбрана лекция {lecture}\nпо предмету {subject}\nСпросите меня по ней:",
-        reply_markup=keyboard
+        f"<b>Лекция:</b> {html.escape(lecture)}\n"
+        f"<b>Предмет:</b> {html.escape(subject)}\n\n"
+        f"Спросите меня по ней:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
     )
 
     save_keyboard_msg(session, call.message)
@@ -88,8 +102,11 @@ async def back_lectures_callback(call: CallbackQuery):
         [InlineKeyboardButton(text="⬅ Назад к предметам", callback_data="back_subjects")]
     )
 
-    await call.message.edit_text(f"Выберите лекцию для предмета {subject}:")
-    await call.message.edit_reply_markup(reply_markup=keyboard)
+    await call.message.edit_text(
+        f"<b>Выберите лекцию</b> для предмета {html.escape(subject)}:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
     save_keyboard_msg(session, call.message)
     await call.answer()
@@ -100,8 +117,11 @@ async def back_subjects_callback(call: CallbackQuery):
     user_id = call.from_user.id
     user_sessions[user_id] = {}
 
-    await call.message.edit_text("Выберите предмет:")
-    await call.message.edit_reply_markup(reply_markup=subjects_keyboard())
+    await call.message.edit_text(
+        "<b>Выберите предмет:</b>",
+        reply_markup=subjects_keyboard(),
+        parse_mode="HTML"
+    )
 
     save_keyboard_msg(user_sessions[user_id], call.message)
     await call.answer()
@@ -114,7 +134,9 @@ async def chat_handler(message: Message):
 
     session = user_sessions.get(user_id)
     if not session or not session.get("lecture"):
-        await message.answer("Сначала выберите предмет и лекцию командой /start")
+        await message.answer(
+            "Сначала выберите предмет и лекцию командой /start"
+        )
         return
 
     subject = session["subject"]
@@ -122,7 +144,7 @@ async def chat_handler(message: Message):
 
     await clear_last_keyboard(message.bot, message.chat.id, session)
 
-    waiting_msg = await message.answer("⏳ Ожидание ответа от LLM...")
+    waiting_msg = await message.answer("⏳ <i>Ожидание ответа от LLM...</i>", parse_mode="HTML")
 
     reply = await llm_client.chat(
         user_id=user_id,
@@ -131,16 +153,28 @@ async def chat_handler(message: Message):
         lecture=lecture
     )
 
-    await waiting_msg.edit_text(reply)
+    # безопасная отправка HTML
+    try:
+        await waiting_msg.edit_text(
+            reply,
+            parse_mode="HTML"
+        )
+    except TelegramBadRequest:
+        await waiting_msg.edit_text(
+            html.escape(reply)
+        )
 
     keyboard_msg = await message.answer(
-        f"Выбрана лекция {lecture}\nпо предмету {subject}\nСпросите меня по ней:",
+        f"<b>Лекция:</b> {html.escape(lecture)}\n"
+        f"<b>Предмет:</b> {html.escape(subject)}\n\n"
+        f"Спросите меня по ней:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="⬅ Назад к лекциям",
                 callback_data=f"back_lectures:{subject}"
             )]
-        ])
+        ]),
+        parse_mode="HTML"
     )
 
     save_keyboard_msg(session, keyboard_msg)
