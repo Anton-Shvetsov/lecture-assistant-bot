@@ -1,0 +1,103 @@
+{
+  "uid": "lecture-analytics",
+  "title": "Lecture Assistant Analytics",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "10s",
+  "tags": ["loki", "lectures"],
+  "templating": {
+    "list": [
+      {
+        "name": "subject",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({job=\"lecture-assistant-bot\"}, subject)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "piechart",
+      "title": "Популярность предметов",
+      "datasource": "Loki",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"lecture-assistant-bot\"}[$__range])) by (subject)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Топ лекций по выбранному предмету",
+      "datasource": "Loki",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"lecture-assistant-bot\", subject=~\"$subject\"}[$__range])) by (lecture)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Hashed tokens (cache_hit)",
+      "datasource": "Loki",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time(({job=\"lecture-assistant-bot\"} | json | unwrap cache_hit)[$__range]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Prompt raw tokens (cache_miss)",
+      "datasource": "Loki",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time(({job=\"lecture-assistant-bot\"} | json | unwrap cache_miss)[$__range]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Completion tokens",
+      "datasource": "Loki",
+      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time(({job=\"lecture-assistant-bot\"} | json | unwrap completion_tokens)[$__range]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Total tokens",
+      "datasource": "Loki",
+      "gridPos": { "x": 18, "y": 8, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time(({job=\"lecture-assistant-bot\"} | json | unwrap total_tokens)[$__range]))",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

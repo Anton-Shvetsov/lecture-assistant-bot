@@ -1,0 +1,38 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: lecture-assistant-bot
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: lecture-assistant-bot
+          __path__: /project/llm_client.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            ts: ts
+            user_id: user_id
+            subject: subject
+            lecture: lecture
+            cache_hit: cache_hit
+            cache_miss: cache_miss
+            completion_tokens: completion_tokens
+            total_tokens: total_tokens
+
+      - timestamp:
+          source: ts
+          format: RFC3339
+
+      - labels:
+          subject:
+          lecture:

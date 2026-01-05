@@ -42,3 +42,30 @@ Run
 ```
 python main.py
 ```
+
+## Monitoring (Optional)
+
+The bot logs usage statistics in `llm_client.log` which can be collected by Promtail and visualized with Grafana.
+
+### SetUp
+
+```
+docker-compose up -d
+```
+
+### Navigation
+
+Dashboard UI is accessible at `http://localhost:3000` (default user: `admin`, password: `admin`)
+
+Dashboards -> Lecture Assistant -> Lecture Assistant Analytics
+
+### Metrics
+
+The Lecture Assistant Analytics dashboard shows:
+
+- **Subjects popularity**: pie chart of most accessed subjects.
+- **Top lectures per subject**: pie chart filtered by the selected subject.
+- **Hashed tokens (cache_hit)**: total tokens served from cache.
+- **Prompt raw tokens (cache_miss)**: total tokens processed by the model as new input.
+- **Completion tokens**: total tokens returned by the model.
+- **Total tokens**: sum of all tokens used (cache + new).

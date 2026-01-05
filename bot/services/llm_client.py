@@ -2,20 +2,35 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 import httpx
+import json
 from bot.config import settings
+from datetime import datetime
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+info_logger = logging.getLogger("llm_info")
+info_logger.setLevel(logging.INFO)
+info_formatter = logging.Formatter('%(message)s')
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+info_console = logging.StreamHandler()
+info_console.setFormatter(info_formatter)
+info_logger.addHandler(info_console)
 
-file_handler = logging.FileHandler("llm_client.log", encoding="utf-8")
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+info_file = logging.FileHandler("llm_client.log", encoding="utf-8")
+info_file.setFormatter(info_formatter)
+info_logger.addHandler(info_file)
+
+
+error_logger = logging.getLogger("llm_error")
+error_logger.setLevel(logging.ERROR)
+error_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+error_console = logging.StreamHandler()
+error_console.setFormatter(error_formatter)
+error_logger.addHandler(error_console)
+
+error_file = logging.FileHandler("llm_client_error.log", encoding="utf-8")
+error_file.setFormatter(error_formatter)
+error_logger.addHandler(error_file)
 
 
 class LLMClient:
@@ -33,7 +48,7 @@ class LLMClient:
             self.lectures_dir = Path(__file__).parent.parent.parent / "lectures"
 
         if not self.lectures_dir.exists():
-            logger.warning(f"Папка с лекциями {self.lectures_dir} не найдена.")
+            error_logger.warning(f"Папка с лекциями {self.lectures_dir} не найдена.")
 
     def _load_lecture(self, subject: str, lecture: str) -> str:
         """
@@ -41,12 +56,12 @@ class LLMClient:
         """
         lecture_file = self.lectures_dir / subject / f"{lecture}.txt"
         if not lecture_file.exists():
-            logger.warning(f"Лекция '{lecture}' для предмета '{subject}' не найдена. Используется дефолтный prompt.")
+            error_logger.warning(f"Лекция '{lecture}' для предмета '{subject}' не найдена. Используется дефолтный prompt.")
             return ""
         try:
             return lecture_file.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error(f"Ошибка при чтении лекции '{lecture}': {e}")
+            error_logger.error(f"Ошибка при чтении лекции '{lecture}': {e}")
             return ""
 
     async def chat(
@@ -96,23 +111,30 @@ class LLMClient:
             completion_tokens = usage.get("completion_tokens")
             total_tokens = usage.get("total_tokens")
 
-            logger.info(
-                f"User {user_id} - cache_hit: {cache_hit}, cache_miss: {cache_miss}, "
-                f"completion_tokens: {completion_tokens}, total_tokens: {total_tokens}"
-            )
+            log_entry = {
+                "ts": datetime.utcnow().isoformat() + "Z",
+                "user_id": user_id,
+                "subject": subject,
+                "lecture": lecture,
+                "cache_hit": cache_hit,
+                "cache_miss": cache_miss,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens
+            }
+            info_logger.info(json.dumps(log_entry, ensure_ascii=False))
 
             reply = data.get("choices", [{}])[0].get("message", {}).get("content")
             if not reply:
-                logger.error(f"Пустой ответ от LLM: {data}")
+                error_logger.error(f"Пустой ответ от LLM: {data}")
                 return "⚠️ Ошибка: пустой ответ от LLM"
 
             return reply
 
         except httpx.RequestError as e:
-            logger.error(f"Request failed: {e}")
+            error_logger.error(f"Request failed: {e}")
             return "⚠️ Ошибка соединения с LLM. Попробуй позже."
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error: {e.response.status_code} {e.response.text}")
+            error_logger.error(f"HTTP error: {e.response.status_code} {e.response.text}")
             return "⚠️ LLM вернул ошибку. Попробуй позже."
 
 
